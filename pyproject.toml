@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "mini-node-wasm-port"
+version = "0.1.0"
+description = ""
+authors = ["Stefane Fermigier <sf@fermigier.com>"]
+#readme = "README.md"
+packages = [{include = "py2wasm_sandbox", from = "src"}]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+devtools = "^0.11.0"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pywasm = "^1.0.8"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
