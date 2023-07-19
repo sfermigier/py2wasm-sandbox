@@ -25,7 +25,6 @@ from devtools import debug
 
 
 class Block:
-
     def __init__(self, lines=None):
         if lines:
             self.lines = list(lines)
@@ -69,7 +68,7 @@ def compile_tree(tree) -> str:
     block = Block()
     block << "(module"
     block.indent()
-    block << '(func $putn (import "imports" "imported_putn") (param i32))'
+    block << '(import "env" "js_putn" (func $putn (param i32)))'
     block << '(export "exported_main" (func $main))'
     block << "(func $main (result i32)"
     block.indent()

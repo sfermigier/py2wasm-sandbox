@@ -41,9 +41,7 @@ def compile_tree(tree):
     var_block = generate_variable_block(tree, 2, lctx)
 
     block = "(module" + LF()
-    block += (
-        TAB() + '(func $putn (import "imports" "imported_putn") (param i32))' + LF()
-    )
+    block += TAB() + '(import "env" "js_putn" (func $putn (param i32)))'
     block += TAB() + '(export "exported_main" (func $main))' + LF()
     block += TAB() + "(func $main (result i32)" + LF()
     block += var_block + LF()
