@@ -11,11 +11,11 @@ from devtools import debug
 
 
 def LF():
-    return '\n'
+    return "\n"
 
 
 def TAB():
-    return '  '
+    return "  "
 
 
 def TABs(n):
@@ -32,24 +32,24 @@ def compile(source: str):
 def compile_tree(tree):
     main_block = generate(tree)
 
-    block = '(module' + LF()
+    block = "(module" + LF()
     block += TAB() + '(export "exported_main" (func $main))' + LF()
-    block += TAB() + '(func $main (result i32)' + LF()
+    block += TAB() + "(func $main (result i32)" + LF()
     block += main_block + LF()
-    block += TAB() + TAB() + 'return' + LF()
-    block += TAB() + ')' + LF()
-    block += ')'
+    block += TAB() + TAB() + "return" + LF()
+    block += TAB() + ")" + LF()
+    block += ")"
 
     return block
 
 
-def generate(tree: AST|list[AST], indent=0):
+def generate(tree: AST | list[AST], indent=0):
     match tree:
         case ast.Module(body):
             return generate(body)
 
         case [*nodes]:
-            return '\n'.join(generate(node) for node in nodes)
+            return "\n".join(generate(node) for node in nodes)
 
         case ast.Expr(value):
             return generate(value)
@@ -62,22 +62,21 @@ def generate(tree: AST|list[AST], indent=0):
             right_block = generate(right, 2)
             match op:
                 case ast.Add():
-                    wasm_op = 'i32.add'
+                    wasm_op = "i32.add"
                 case ast.Sub():
-                    wasm_op = 'i32.sub'
+                    wasm_op = "i32.sub"
                 case ast.Mult():
-                    wasm_op = 'i32.mul'
+                    wasm_op = "i32.mul"
                 case ast.Div():
-                    wasm_op = 'i32.div_s'
+                    wasm_op = "i32.div_s"
                 case ast.Mod():
-                    wasm_op = 'i32.rem_s'
+                    wasm_op = "i32.rem_s"
                 case _:
                     raise NotImplementedError(f"Unknown operator {op!r}")
             return left_block + LF() + right_block + LF() + TABs(2) + wasm_op
 
         case int(n):
-            return f'i32.const {n}'
+            return f"i32.const {n}"
 
         case _:
             raise NotImplementedError(f"Unknown node {tree!r}")
-

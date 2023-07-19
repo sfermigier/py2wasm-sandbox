@@ -14,7 +14,11 @@ if 0:
     putn(2)
 else:
     putn(3)
-    
+
+i = 0
+while i < 10:
+    i = i + 1
+
 0
 """
 

@@ -16,29 +16,43 @@
 #   - 05: if
 #   - 05: if-else
 # - 05: while
-# - 06: user defined function
-#   - single arg
-#   - multi args
-#   - ret
-#   - call user defined / builtin
-#   - dummy ret code?
-#   - generate function code
-#   - self call (fib)
+# - 06: Refactor block generation
 
 import ast
 from ast import AST
 
-
-def LF():
-    return '\n'
+from devtools import debug
 
 
-def TAB():
-    return '  '
+class Block:
 
+    def __init__(self, lines=None):
+        if lines:
+            self.lines = list(lines)
+        else:
+            self.lines = []
+        self.indentation: int = 0
 
-def TABs(n):
-    return TAB() * n
+    def __lshift__(self, other):
+        match other:
+            case str(line):
+                self.lines += ["  " * self.indentation + line]
+            case Block():
+                block = other
+                assert block.indentation == 0
+                for line in block.lines:
+                    self << line
+            case _:
+                raise ValueError(f"Unknown type: {type(other)}")
+
+    def indent(self):
+        self.indentation += 1
+
+    def dedent(self):
+        self.indentation -= 1
+
+    def __str__(self):
+        return "\n".join(self.lines)
 
 
 def compile(source: str) -> str:
@@ -47,85 +61,102 @@ def compile(source: str) -> str:
     return wat
 
 
-def compile_tree(tree):
+def compile_tree(tree) -> str:
     lctx = {}
-    main_block = generate(tree, 2, lctx)
-    var_block = generate_variable_block(tree, 2, lctx)
+    main_block = generate(tree, lctx)
+    var_block = generate_variable_block(tree, lctx)
 
-    block = '(module' + LF()
-    block += TAB() + '(func $putn (import "imports" "imported_putn") (param i32))' + LF()
-    block += TAB() + '(export "exported_main" (func $main))' + LF()
-    block += TAB() + '(func $main (result i32)' + LF()
-    block += var_block + LF()
-    block += main_block + LF()
-    block += TAB() + TAB() + 'return' + LF()
-    block += TAB() + ')' + LF()
-    block += ')'
+    block = Block()
+    block << "(module"
+    block.indent()
+    block << '(func $putn (import "imports" "imported_putn") (param i32))'
+    block << '(export "exported_main" (func $main))'
+    block << "(func $main (result i32)"
+    block.indent()
+    block << var_block
+    block << main_block
+    block << "return"
+    block.dedent()
+    block << ")"
+    block.dedent()
+    block << ")"
 
-    return block
+    return str(block)
 
 
-def generate(tree: AST | list[AST], indent, lctx):
+def generate(tree: AST | list[AST], lctx) -> Block:
     match tree:
         case ast.Module(body):
-            return generate(body, indent, lctx)
+            return generate(body, lctx)
 
         case [*nodes]:
-            return '\n'.join(generate(node, indent, lctx) for node in nodes)
+            return Block(generate(node, lctx) for node in nodes)
 
         case ast.Expr(value):
-            return generate(value, indent, lctx)
+            return generate(value, lctx)
 
         case ast.Constant(value):
-            return TABs(indent) + generate(value, indent, lctx)
+            return generate(value, lctx)
 
         case ast.BinOp(left, op, right):
-            left_block = generate(left, 2, lctx)
-            right_block = generate(right, 2, lctx)
+            left_block = generate(left, lctx)
+            right_block = generate(right, lctx)
             match op:
                 case ast.Add():
-                    wasm_op = 'i32.add'
+                    wasm_op = "i32.add"
                 case ast.Sub():
-                    wasm_op = 'i32.sub'
+                    wasm_op = "i32.sub"
                 case ast.Mult():
-                    wasm_op = 'i32.mul'
+                    wasm_op = "i32.mul"
                 case ast.Div():
-                    wasm_op = 'i32.div_s'
+                    wasm_op = "i32.div_s"
                 case ast.Mod():
-                    wasm_op = 'i32.rem_s'
+                    wasm_op = "i32.rem_s"
                 case _:
                     raise NotImplementedError(f"Unknown operator {op!r}")
-            return left_block + LF() + right_block + LF() + TABs(2) + wasm_op
+
+            block = Block()
+            block << left_block
+            block << right_block
+            block << wasm_op
+            return block
 
         case ast.Compare(left, ops, comparators):
-            left_block = generate(left, 2, lctx)
+            left_block = generate(left, lctx)
             op = ops[0]
             right = comparators[0]
-            right_block = generate(right, 2, lctx)
+            right_block = generate(right, lctx)
             match op:
                 case ast.Eq():
-                    wasm_op = 'i32.eq'
+                    wasm_op = "i32.eq"
                 case ast.NotEq():
-                    wasm_op = 'i32.ne'
+                    wasm_op = "i32.ne"
                 case ast.Lt():
-                    wasm_op = 'i32.lt_s'
+                    wasm_op = "i32.lt_s"
                 case ast.LtE():
-                    wasm_op = 'i32.le_s'
+                    wasm_op = "i32.le_s"
                 case ast.Gt():
-                    wasm_op = 'i32.gt_s'
+                    wasm_op = "i32.gt_s"
                 case ast.GtE():
-                    wasm_op = 'i32.ge_s'
+                    wasm_op = "i32.ge_s"
                 case _:
                     raise NotImplementedError(f"Unknown operator {op!r}")
-            return left_block + LF() + right_block + LF() + TABs(2) + wasm_op
+
+            block = Block()
+            block.indent()
+            block << left_block
+            block << right_block
+            block << wasm_op
+            block.dedent()
+            return block
 
         case int(n):
-            return f'i32.const {n}'
+            return Block([f"i32.const {n}"])
 
         case ast.Call(func, args):
             match func:
-                case ast.Name(id='putn'):
-                    return generateCallPutn(args, indent, lctx)
+                case ast.Name(id="putn"):
+                    return generateCallPutn(args, lctx)
                 case _:
                     raise ValueError(f"Unknown function {func!r}")
 
@@ -134,89 +165,103 @@ def generate(tree: AST | list[AST], indent, lctx):
             target = targets[0]
             assert isinstance(target, ast.Name)
             name = target.id
-            return assign_variable(name, value, indent, lctx)
+            return assign_variable(name, value, lctx)
 
         case ast.Name(id):
-            return refer_variable(id, indent, lctx)
+            return refer_variable(id, lctx)
 
         case ast.If(test, body, orelse):
-            test_block = generate(test, indent, lctx)
-            body_block = generate(body, indent+1, lctx)
-            block = test_block + LF()
-            block += TABs(indent) + 'if' + LF()
-            block += body_block + LF()
+            test_block = generate(test, lctx)
+            body_block = generate(body, lctx)
+
+            block = Block()
+            block << test_block
+            block << "if"
+            block.indent()
+            block << body_block
+            block.dedent()
 
             if orelse:
-                orelse_block = generate(orelse, indent+1, lctx)
-                block += TABs(indent) + 'else' + LF()
-                block += orelse_block + LF()
+                orelse_block = generate(orelse, lctx)
+                block << "else"
+                block.indent()
+                block << orelse_block
+                block.dedent()
 
-            block += TABs(indent) + 'end' + LF()
+            block << "end"
+
             return block
 
         case ast.While(test, body, orelse):
-            test_block = generate(test, indent+1, lctx)
-            body_block = generate(body, indent+2, lctx)
+            test_block = generate(test, lctx)
+            body_block = generate(body, lctx)
 
-            block = TABs(indent) + 'loop ;; begin of while loop' + LF()
-            block += test_block + LF()
-            block += TABs(indent+1) + 'if' + LF()
-            block += body_block + LF()
-            block += TABs(indent+2) + 'br 1 ;; jump to head of while loop' + LF()
-            block += TABs(indent+1) + 'end ;; end of if-then' + LF()
-            block += TABs(indent) + 'end ;; end of while loop' + LF()
+            debug(test_block.lines, test_block.indentation)
+
+            block = Block()
+            block << "loop ;; begin of while loop"
+            block << test_block
+            block.indent()
+            block << "if"
+            block.indent()
+            block << body_block
+            block << "br 1 ;; jump to head of while loop"
+            block.dedent()
+            block << "end ;; end of if-then"
+            block.dedent()
+            block << "end ;; end of while loop"
+
             return block
 
         case _:
             raise NotImplementedError(f"Unknown node {tree!r}")
 
 
-def generateCallPutn(args, indent, lctx):
+def generateCallPutn(args, lctx) -> Block:
     """Debug function"""
-    valueBlock = generate(args, indent, lctx)
-    assert valueBlock
+    value_block = generate(args, lctx)
+    assert value_block
 
-    block = valueBlock + LF()
-    block += TABs(indent) + 'call $putn' + LF()
+    block = Block()
+    block << value_block
+    block << "call $putn"
 
     return block
 
 
 # --- refer variable ---
-def refer_variable(name, indent, lctx):
+def refer_variable(name, lctx) -> Block:
     # -- check EXIST --
     if name in lctx:
         var_name = lctx[name]
-        block = TABs(indent) + 'local.get ' + var_name
+        block = Block(["local.get " + var_name])
+
         return block
 
     raise ValueError(f"Unknown variable {name!r}")
 
 
-# --- assign variable ---
-def assign_variable(name: str, value: AST, indent: int, lctx: dict):
-    # -- check EXIST --
-    block = ''
-
+def assign_variable(name: str, value: AST, lctx: dict):
     if name in lctx:
         var_name = lctx[name]
     else:
-        var_name = '$' + name
+        var_name = "$" + name
         lctx[name] = var_name
 
-    value_block = generate(value, indent, lctx)
+    value_block = generate(value, lctx)
     assert value_block
 
-    block += value_block + LF()
-    block += TABs(indent) + 'local.set ' + var_name + LF()
+    block = Block()
+    block << value_block
+    block << "local.set " + var_name
 
     return block
 
 
-def generate_variable_block(tree, indent, lctx):
-    block = ''
+def generate_variable_block(tree, lctx) -> Block:
+    block = Block()
     for key in lctx.keys():
         var_name = lctx[key]
-        block += TABs(indent) + '(local ' + var_name + ' i32)' + LF()
+        block << "(local " + var_name + " i32)"
 
     return block

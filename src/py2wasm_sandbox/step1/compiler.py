@@ -11,11 +11,11 @@ from devtools import debug
 
 
 def LF():
-    return '\n'
+    return "\n"
 
 
 def TAB():
-    return '  '
+    return "  "
 
 
 def compile(source: str):
@@ -28,24 +28,24 @@ def compile(source: str):
 def compile_tree(tree):
     main_block = generate(tree)
 
-    block = '(module' + LF()
+    block = "(module" + LF()
     block += TAB() + '(export "exported_main" (func $main))' + LF()
-    block += TAB() + '(func $main (result i32)' + LF()
+    block += TAB() + "(func $main (result i32)" + LF()
     block += TAB() + TAB() + main_block + LF()
-    block += TAB() + TAB() + 'return' + LF()
-    block += TAB() + ')' + LF()
-    block += ')'
+    block += TAB() + TAB() + "return" + LF()
+    block += TAB() + ")" + LF()
+    block += ")"
 
     return block
 
 
-def generate(tree: AST|list[AST]):
+def generate(tree: AST | list[AST]):
     match tree:
         case ast.Module(body):
             return generate(body)
 
         case [*nodes]:
-            return '\n'.join(generate(node) for node in nodes)
+            return "\n".join(generate(node) for node in nodes)
 
         case ast.Expr(value):
             return generate(value)
@@ -55,9 +55,7 @@ def generate(tree: AST|list[AST]):
 
         case int(n):
             # block = 'i32.const ' + str(v)
-            return f'i32.const {n}'
+            return f"i32.const {n}"
 
         case _:
             raise NotImplementedError(f"Unknown node {tree!r}")
-
-
